@@ -185,8 +185,8 @@ def list_service(ctx, output, fields):
     type=str,
     default=None,
 )
-def get_service(ctx, user, output, fields):
-    if not PDH.get_service(ctx.obj, user, output, fields):
+def get_service(ctx, service, output, fields):
+    if not PDH.get_service(ctx.obj, service, output, fields):
         sys.exit(1)
 
 
@@ -232,7 +232,7 @@ def snooze(ctx, incidentids, duration):
 @click.option("-u", "--user", required=True, help="User name or email to assign to (fuzzy find!)")
 @click.argument("incident", nargs=-1)
 def reassign(ctx, incident, user):
-    PDH.reassing(ctx.obj, incident, user)
+    PDH.reassign(ctx.obj, incident, user)
 
 
 @inc.command(help="Apply scripts with sideeffects to given incident")

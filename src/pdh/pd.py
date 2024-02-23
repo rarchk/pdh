@@ -206,3 +206,12 @@ class Services(PD):
     def get(self, id: str) -> Dict:
         """Get a single service by ID"""
         return self.session.rget(f"/service/{id}")
+
+    def search(self, query: str, key: str = "name") -> List[dict]:
+        """Retrieve all services matching query on the attribute name."""
+
+        def equiv(s):
+            return query.lower() in s[key].lower()
+
+        services = [s for s in filter(equiv, self.session.iter_all("services"))]
+        return services
