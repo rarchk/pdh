@@ -103,3 +103,6 @@ class Transformation(object):
 
     def extract_users_teams():
         return lambda x: ",".join([t["summary"] for t in x["teams"]])
+
+    def ref_links(ref_field: str, link_field: str):
+        return lambda x: f"[link={x[link_field]}]{x[ref_field]}[/link]"

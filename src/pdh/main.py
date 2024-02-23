@@ -124,6 +124,71 @@ def user_get(ctx, user, output, fields):
     if not PDH.get_user(ctx.obj, user, output, fields):
         sys.exit(1)
 
+@main.group(help="Operater on Services")
+@click.option(
+    "-c",
+    "--config",
+    envvar="PDH_CONFIG",
+    default="~/.config/pdh.yaml",
+    help="Configuration file location (default: ~/.config/pdh.yaml)",
+)
+@click.pass_context
+def services(ctx, config):
+    cfg = load_and_validate(config)
+    ctx.ensure_object(dict)
+    ctx.obj = cfg
+
+
+@services.command(help="List services", name="ls")
+@click.pass_context
+@click.option(
+    "-o",
+    "--output",
+    "output",
+    help="output format",
+    required=False,
+    type=click.Choice(VALID_OUTPUTS),
+    default="table",
+)
+@click.option(
+    "-f",
+    "--fields",
+    "fields",
+    help="Filter fields",
+    required=False,
+    type=str,
+    default=None,
+)
+def list_service(ctx, output, fields):
+    if not PDH.list_service(ctx.obj, output, fields):
+        sys.exit(1)
+
+
+@services.command(help="Retrieve an service by name or ID", name="get")
+@click.pass_context
+@click.argument("service")
+@click.option(
+    "-o",
+    "--output",
+    "output",
+    help="output format",
+    required=False,
+    type=click.Choice(VALID_OUTPUTS),
+    default="table",
+)
+@click.option(
+    "-f",
+    "--fields",
+    "fields",
+    help="Filter fields",
+    required=False,
+    type=str,
+    default=None,
+)
+def get_service(ctx, user, output, fields):
+    if not PDH.get_service(ctx.obj, user, output, fields):
+        sys.exit(1)
+
 
 @main.group(help="Operater on Incidents")
 @click.option(
