@@ -56,7 +56,7 @@ class PD(object):
 
 
 class Incidents(PD):
-    def list(self, userid: list = None, statuses: list = DEFAULT_STATUSES, urgencies: list = DEFAULT_URGENCIES, serviceid: list = None) -> List:
+    def list(self, userid: list = None, serviceid: list = None, statuses: list = DEFAULT_STATUSES, urgencies: list = DEFAULT_URGENCIES) -> List:
         """List all incidents"""
         params = {"statuses[]": statuses, "urgencies[]": urgencies}
         if userid:
@@ -215,3 +215,12 @@ class Services(PD):
 
         services = [s for s in filter(equiv, self.session.iter_all("services"))]
         return services
+    def serviceIDs(self, query: str, key: str = "name") -> List[str]:
+        """Retrieve all serviceIDs matching query on the attribute name."""
+        services = self.search(query, key)
+        serviceIDs = [s["id"] for s in services]
+        return serviceIDs
+
+    def serviceID_by_name(self, query):
+        """Retrieve all serviceID matching the given (partial) name."""
+        return self.serviceIDs(query, "name")

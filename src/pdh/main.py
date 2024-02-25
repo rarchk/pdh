@@ -24,7 +24,7 @@ from rich import print
 from rich.console import Console
 from .core import PDH
 
-from .pd import Users, Incidents
+from .pd import Users, Incidents, Services
 from .pd import (
     STATUS_TRIGGERED,
     STATUS_ACK,
@@ -133,13 +133,13 @@ def user_get(ctx, user, output, fields):
     help="Configuration file location (default: ~/.config/pdh.yaml)",
 )
 @click.pass_context
-def services(ctx, config):
+def service(ctx, config):
     cfg = load_and_validate(config)
     ctx.ensure_object(dict)
     ctx.obj = cfg
 
 
-@services.command(help="List services", name="ls")
+@service.command(help="List services", name="ls")
 @click.pass_context
 @click.option(
     "-o",
@@ -164,7 +164,7 @@ def list_service(ctx, output, fields):
         sys.exit(1)
 
 
-@services.command(help="Retrieve an service by name or ID", name="get")
+@service.command(help="Retrieve an service by name or ID", name="get")
 @click.pass_context
 @click.argument("service")
 @click.option(
@@ -190,7 +190,7 @@ def get_service(ctx, service, output, fields):
         sys.exit(1)
 
 
-@main.group(help="Operater on Incidents")
+@main.group(help="Operator on Incidents")
 @click.option(
     "-c",
     "--config",
@@ -280,7 +280,8 @@ def apply(ctx, incident, path, output, script):
 @inc.command(help="List incidents", name="ls")
 @click.pass_context
 @click.option("-e", "--everything", help="List all incidents not only assigned to me", is_flag=True, default=False)
-@click.option("-u", "--user", default=None, help="Filter only incidents assigned to this user ID")
+@click.option("-u", "--user", default=None, help="Filter only incidents assigned to this user[ID or name]")
+@click.option("--service", default=None, help="Filter only incidents assigned to service[ID or name]")
 @click.option("-n", "--new", is_flag=True, default=False, help="Filter only newly triggered incident")
 @click.option("-a", "--ack", is_flag=True, default=False, help="Acknowledge incident listed here")
 @click.option("-s", "--snooze", is_flag=True, default=False, help="Snooze for 4 hours incident listed here")
@@ -304,7 +305,7 @@ def apply(ctx, incident, path, output, script):
 @click.option("-f", "--fields", "fields", required=False, help="Fields to filter and output", default=None)
 @click.option("--alerts", "alerts", required=False, help="Show alerts associated to each incidents", is_flag=True, default=False)
 @click.option("--alert-fields", "alert_fields", required=False, help="Show these alert fields only, comma separated", default=None)
-def inc_list(ctx, everything, user, new, ack, output, snooze, resolve, high, low, watch, timeout, regexp, apply, rules_path, fields, alerts, alert_fields):
+def inc_list(ctx, everything, user, service, new, ack, output, snooze, resolve, high, low, watch, timeout, regexp, apply, rules_path, fields, alerts, alert_fields):
 
     # Prepare defaults
     status = [STATUS_TRIGGERED]
@@ -316,8 +317,11 @@ def inc_list(ctx, everything, user, new, ack, output, snooze, resolve, high, low
     if not new:
         status.append(STATUS_ACK)
     userid = None
+    serviceid = None
     if user:
         userid = Users(ctx.obj).userID_by_name(user)
+    if service:
+        serviceid = Services(ctx.obj).serviceID_by_name(service)
 
     filter_re = None
     try:
@@ -335,7 +339,7 @@ def inc_list(ctx, everything, user, new, ack, output, snooze, resolve, high, low
     if type(fields) is str:
         fields = fields.lower().strip().split(",")
     else:
-        fields = ["id", "assignee", "title", "status", "created_at", "last_status_change_at", "url"]
+        fields = ["id", "assignee", "title", "status", "created_at", "last_status_change_at"]
     if alerts:
         fields.append("alerts")
 
@@ -347,7 +351,7 @@ def inc_list(ctx, everything, user, new, ack, output, snooze, resolve, high, low
     if not everything and not userid:
         userid = pd.cfg["uid"]
     while True:
-        incs = pd.list(userid, statuses=status, urgencies=urgencies)
+        incs = pd.list(userid, serviceid, statuses=status, urgencies=urgencies)
         # BUGFIX: filter by regexp must be applyed to the original list, not only to the transformed one
         incs = Filter.do(incs, filters=[Filter.regexp("title", filter_re)])
 
@@ -357,24 +361,24 @@ def inc_list(ctx, everything, user, new, ack, output, snooze, resolve, high, low
 
         # Build filtered list for output
         if output != "raw":
-            transformations = dict()
+            t = {}
             for f in fields:
-                transformations[f] = Transformation.extract_field(f)
+                t[f] = Transformation.extract_field(f)
                 # special cases
                 if f == "assignee":
-                    transformations[f] = Transformation.extract_assignees()
+                    t[f] = Transformation.extract_assignees()
                 if f == "status":
-                    transformations[f] = Transformation.extract_field("status", ["red", "yellow"], "status", STATUS_TRIGGERED, True, {STATUS_ACK: "✔", STATUS_TRIGGERED: "✘"})
-                if f == "url":
-                    transformations[f] = Transformation.extract_field("html_url")
+                    t[f] = Transformation.extract_field("status", ["red", "yellow"], "status", STATUS_TRIGGERED, True, {STATUS_ACK: "✔", STATUS_TRIGGERED: "✘"})
                 if f in ["title", "urgency"]:
-                    transformations[f] = Transformation.extract_field(f, check=True)
+                    t[f] = Transformation.extract_field(f, check=True)
                 if f in ["created_at", "last_status_change_at"]:
-                    transformations[f] = Transformation.extract_date(f)
+                    t[f] = Transformation.extract_date(f)
                 if f in ["alerts"]:
-                    transformations[f] = Transformation.extract_alerts(f, alert_fields)
+                    t[f] = Transformation.extract_alerts(f, alert_fields)
+                t["id"] = Transformation.ref_links('id', 'html_url')
+                # t["title"] = Transformation.add_observability_links('title',)
 
-            filtered = Filter.do(incs, transformations)
+            filtered = Filter.do(incs, t)
         else:
             # raw output, using json format
             filtered = incs

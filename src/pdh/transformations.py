@@ -18,6 +18,8 @@ from typing import Any
 from .pd import URGENCY_HIGH
 from datetime import datetime
 from rich.pretty import pretty_repr
+import re
+from .filters import Filter
 
 
 class Transformation(object):
@@ -79,22 +81,38 @@ class Transformation(object):
         return extract
 
     def extract_alerts(field_name, alert_fields: list[str] = ["id", "summary", "created_at", "status"]):
-        from jsonpath_ng import parse
-
         def extract(i: dict) -> str:
+            # print(i)
+            # print(field_name, alert_fields)
             alerts = i[field_name]
             ret = dict()
             for alert in alerts:
                 alert_obj = dict()
+                # print("alert:", alert)
                 for field in alert_fields:
                     if field not in alert:
-                        expression = parse(field)
-                        alert_obj.update({field: match.value for match in expression.find(alert)})
+                        # processing a field in a way body.details.dashobard_url
+                        alert_obj[field] = Transformation.extract_nested_field(field)
                     else:
-                        alert_obj[field] = alert[field]
+                        alert_obj[field] = Transformation.extract_field(field, check=False)
+                        # alert_obj[field] = alert[field]
+                # alert_obj['alert_id'] = f"[link={alert['html_url']}]{alert['id']}[/link]"
+                alert_obj['id'] = Transformation.ref_links('id', 'html_url')
+                # print(alert_obj, type(alert_obj))
+                filtered = Filter.do(alerts, alert_obj, [])
+                if 'body.details.dashboard_url' in alert_fields:
+                    for idx,_ in enumerate(filtered):
+                        filtered[idx]['dashboard'] = Transformation.str_to_html(filtered[idx]['body.details.dashboard_url'])
+                        filtered[idx].pop("body.details.dashboard_url")
 
-                ret[alert["id"]] = alert_obj
+                if 'body.details.runbook_url' in alert_fields:
+                    for idx,_ in enumerate(filtered):
+                        filtered[idx]['runbook'] = Transformation.str_to_html(filtered[idx]['body.details.runbook_url'])
+                        filtered[idx].pop("body.details.runbook_url")
+
+                ret = filtered
             return pretty_repr(ret)
+            # return yaml.dump(ret)
 
         return extract
 
@@ -104,5 +122,18 @@ class Transformation(object):
     def extract_users_teams():
         return lambda x: ",".join([t["summary"] for t in x["teams"]])
 
+    def extract_nested_field(field: str,):
+        from jsonpath_ng import parse
+        expression = parse(field)
+        # alert_obj.update({field: match.value for match in expression.find(alert)})
+        return lambda x: (match.value for match in expression.find(x))
+
     def ref_links(ref_field: str, link_field: str):
         return lambda x: f"[link={x[link_field]}]{x[ref_field]}[/link]"
+
+    def str_to_html(field: str):
+        links = re.findall(r'(https?://\S+)', field)
+        link_str = ""
+        for _, link in enumerate(links):
+            link_str+=f"[link={link}]{link}[/link]\n"
+        return link_str
