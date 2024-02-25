@@ -16,7 +16,7 @@
 #
 from .transformations import Transformation
 from .filters import Filter
-from .pd import UnauthorizedException, Users, Incidents
+from .pd import UnauthorizedException, Users, Incidents, Services
 from .config import Config
 from .output import print, print_items
 
@@ -40,9 +40,14 @@ class PDH(object):
                     t[f] = Transformation.extract_field(f, check=False)
                 if "teams" in fields:
                     t["teams"] = Transformation.extract_users_teams()
+                t["id"] = Transformation.ref_links('id', 'html_url')
                 filtered = Filter.do(users, t, [])
 
             print_items(filtered, output)
+            # users = Users(cfg).list()
+            # for i in users:
+            #     print(i)
+            #     break
             return True
         except UnauthorizedException as e:
             print(f"[red]{e}[/red]")
@@ -65,12 +70,69 @@ class PDH(object):
             if output == "raw":
                 filtered = users
             else:
-                transformations = {}
-                for t in fields:
-                    transformations[t] = Transformation.extract_field(t, check=False)
-                transformations["teams"] = Transformation.extract_users_teams()
+                t = {}
+                for f in fields:
+                    t[f] = Transformation.extract_field(f, check=False)
+                t["teams"] = Transformation.extract_users_teams()
+                t["id"] = Transformation.ref_links('id', 'html_url')
+                filtered = Filter.do(users, t, [])
 
-                filtered = Filter.do(users, transformations, [])
+            print_items(filtered, output)
+            return True
+        except UnauthorizedException as e:
+            print(f"[red]{e}[/red]")
+            return False
+
+    def list_service(cfg: Config, output: str, fields: list = None) -> bool:
+        "Lists all the services"
+        try:
+            if fields is None:
+                fields = ["id", "name", "description"]
+
+            if isinstance(fields, str):
+                fields = fields.split(",")
+
+            services = Services(cfg).list()
+
+            if output == "raw":
+                filtered = services
+            else:
+                t = {}
+                for f in fields:
+                    t[f] = Transformation.extract_field(f, check=False)
+                t["id"] = Transformation.ref_links('id', 'html_url')
+
+                filtered = Filter.do(services, t, [])
+                #print(t)
+
+            print_items(filtered, output)
+            return True
+        except UnauthorizedException as e:
+            print(f"[red]{e}[/red]")
+            return False
+
+    def get_service(cfg: Config, service: str, output: str, fields: list = None):
+        try:
+            s = Services(cfg)
+            services = s.search(service)
+            if len(services) == 0:
+                services = s.search(service, "id")
+
+            if fields is None:
+                fields = ["id", "name", "description"]
+
+            if isinstance(fields, str):
+                fields = fields.split(",")
+
+            # Prepare to filter and transform
+            if output == "raw":
+                filtered = services
+            else:
+                t = {}
+                for f in fields:
+                    t[f] = Transformation.extract_field(f, check=False)
+                t["id"] = Transformation.ref_links('id', 'html_url')
+                filtered = Filter.do(services, t, [])
 
             print_items(filtered, output)
             return True
@@ -105,7 +167,7 @@ class PDH(object):
 
         pd.snooze(incs, duration)
 
-    def reassing(cfg: Config, incIDs: list = [], user: str = None):
+    def reassign(cfg: Config, incIDs: list = [], user: str = None):
         pd = Incidents(cfg)
         incs = pd.list()
         incs = Filter.do(incs, filters=[Filter.inList("id", incIDs)])

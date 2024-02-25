@@ -56,11 +56,13 @@ class PD(object):
 
 
 class Incidents(PD):
-    def list(self, userid: list = None, statuses: list = DEFAULT_STATUSES, urgencies: list = DEFAULT_URGENCIES) -> List:
+    def list(self, userid: list = None, serviceid: list = None, statuses: list = DEFAULT_STATUSES, urgencies: list = DEFAULT_URGENCIES) -> List:
         """List all incidents"""
         params = {"statuses[]": statuses, "urgencies[]": urgencies}
         if userid:
             params["user_ids[]"] = userid
+        if serviceid:
+            params["service_ids[]"] = serviceid
         return self.session.list_all("incidents", params=params)
 
     def mine(self, statuses: list = DEFAULT_STATUSES, urgencies: list = DEFAULT_URGENCIES) -> List:
@@ -194,3 +196,31 @@ class Users(PD):
     def userID_by_name(self, query):
         """Retrieve all usersIDs matching the given (partial) name"""
         return self.userIDs(query, "name")
+
+class Services(PD):
+    def list(self) -> list(dict()):
+        """List all services in PagerDuty account"""
+        users = self.session.iter_all("services")
+        return users
+
+    def get(self, id: str) -> Dict:
+        """Get a single service by ID"""
+        return self.session.rget(f"/service/{id}")
+
+    def search(self, query: str, key: str = "name") -> List[dict]:
+        """Retrieve all services matching query on the attribute name."""
+
+        def equiv(s):
+            return query.lower() in s[key].lower()
+
+        services = [s for s in filter(equiv, self.session.iter_all("services"))]
+        return services
+    def serviceIDs(self, query: str, key: str = "name") -> List[str]:
+        """Retrieve all serviceIDs matching query on the attribute name."""
+        services = self.search(query, key)
+        serviceIDs = [s["id"] for s in services]
+        return serviceIDs
+
+    def serviceID_by_name(self, query):
+        """Retrieve all serviceID matching the given (partial) name."""
+        return self.serviceIDs(query, "name")

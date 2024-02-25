@@ -122,7 +122,11 @@ class Filter(object):
             if transformations is not None:
                 item = {}
                 for path, func in transformations.items():
-                    item[path] = func(obj)
+                    # in case a generator function exists
+                    try:
+                        item[path] = next(func(obj))
+                    except Exception:
+                        item[path] = func(obj)
                 ret.append(item)
             else:
                 ret.append(obj)
